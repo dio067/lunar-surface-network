@@ -37,3 +37,8 @@ for _, sat1 in sats.iterrows():
         dist = np.sqrt((sat.altitude_km)**2 + (site.lat - site.lat)**2 + (site.lon - site.lon)**2)
         if dist <= sat.coverage_radius_km:
             G.add_edge(sat.name, site.name, weight=dist)
+
+# Draw the graph
+colors = ['skyblue' if G.nodes[n]['type']=='surface' else 'orange' for n in G.nodes()]
+nx.draw(G, with_labels=True, node_color=colors, node_size=2000)
+plt.show()
