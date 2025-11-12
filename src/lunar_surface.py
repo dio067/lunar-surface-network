@@ -42,3 +42,10 @@ for _, sat1 in sats.iterrows():
 colors = ['skyblue' if G.nodes[n]['type']=='surface' else 'orange' for n in G.nodes()]
 nx.draw(G, with_labels=True, node_color=colors, node_size=2000)
 plt.show()
+
+# Centerality Analysis
+deg = nx.degree_centrality(G)
+eig = nx.eigenvector_centrality(G)
+
+print("Degree Centrality:", deg)
+print("Eigenvector Centrality:", eig)
