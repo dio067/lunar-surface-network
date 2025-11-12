@@ -1,0 +1,3 @@
+name,altitude_km,coverage_radius_km,type
+LunarOrbiter1,200,500,satellite
+GatewayRelay,500,1000,satellite
