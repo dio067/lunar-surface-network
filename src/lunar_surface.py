@@ -2,6 +2,7 @@ import pandas as pd;
 import numpy as np;
 import networkx as nx;
 import matplotlib.pyplot as plt;
+import community as community_louvain
 
 
 # Load lunar surface site data and satellite data
@@ -49,3 +50,7 @@ eig = nx.eigenvector_centrality(G)
 
 print("Degree Centrality:", deg)
 print("Eigenvector Centrality:", eig)
+
+# Modularity (Communities)
+partition = community_louvain.best_partition(G)
+print("Communities:", partition)
