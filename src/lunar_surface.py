@@ -81,3 +81,18 @@ def visualize_graph(G):
 
 
 
+def main():
+    conn = get_connection()
+    landing_sites, satellites = load_data(conn)
+    G = build_graph(landing_sites, satellites)
+    deg, eig, partition, HvN = compute_metrics(G)
+    visualize_graph(G)
+
+    # Print metrics
+    print("Degree Centrality:", deg)
+    print("Eigenvector Centrality:", eig)
+    print("Communities:", partition)
+    print("Von Neumann Entropy:", HvN)
+
+if __name__ == "__main__":
+    main()
