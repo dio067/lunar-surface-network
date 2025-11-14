@@ -25,6 +25,9 @@ from community import community_louvain
 #     satellites = pd.read_sql("SELECT * FROM satellites;", conn)
 #     return landing_sites, satellites
 
+# Constants
+MOON_RADIUS_KM = 1737.4
+
 # Create a graph
 def create_graph(landing, sats, surface_threshold_km=900, max_isl_range=2500):
     G = nx.Graph()
