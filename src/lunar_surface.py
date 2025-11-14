@@ -711,18 +711,79 @@ def generate_enhanced_nasa_data():
     return landing_sites, satellites
 
 
-# Main
+# Main Excution
 def main():
-    conn = get_db_connection()
-    landing_sites, satellites = load_data(conn)
-    G = create_graph(landing_sites, satellites)
-    deg, eig, partition, HvN = compute_metrics(G)
-    visualize_graph(G)
+    def main():
+    print("\n" + "="*80)
+    print("LUNAR COMMUNICATION NETWORK ANALYSIS")
+    print("Real Dataset: Famous Craters + Apollo/Luna Sites + 3 Orbiters")
+    print("="*80 + "\n")
 
-    print("Degree Centrality:", deg)
-    print("Eigenvector Centrality:", eig)
-    print("Communities:", partition)
-    print("Von Neumann Entropy:", HvN)
+    # Generate REAL data
+    print("Generating REAL lunar data (craters + landing sites + orbiters)...")
+    landing_sites_orig, satellites_orig = generate_enhanced_nasa_data()
+    print(f"Surface sites (craters + landings): {len(landing_sites_orig)}")
+    print(f"Satellites: {len(satellites_orig)}")
+
+    # Build and prune graph
+    print("\nBuilding and pruning lunar network graph...")
+    G, edges_df, landing_sites, satellites = create_graph(
+        landing_sites_orig,
+        satellites_orig,
+        surface_threshold_km=900,   # smaller threshold for fewer edges
+        max_isl_range=2500          # moderate sat-to-sat links
+    )
+
+    # Save original node data to CSV
+    save_to_csv(landing_sites_orig, satellites_orig)
+
+    # Compute metrics
+    metrics = compute_metrics(G)
+    print("✓ Metrics computed")
+
+    # Print detailed terminal discription
+    print_detailed_discription(G, landing_sites, satellites, metrics)
+
+    # Visualize
+    print("\nCreating visualizations...")
+    visualize_3d_network(G, landing_sites, satellites, metrics, save_fig=True)
+
+    # Export centrality data
+    centrality_df = pd.DataFrame({
+        'node': list(G.nodes()),
+        'type': [G.nodes[n]['type'] for n in G.nodes()],
+        'mission': [G.nodes[n].get('mission_type', 'N/A') for n in G.nodes()],
+        'degree_centrality': [metrics['degree_centrality'][n] for n in G.nodes()],
+        'betweenness_centrality': [metrics['betweenness_centrality'][n] for n in G.nodes()],
+        'closeness_centrality': [metrics['closeness_centrality'][n] for n in G.nodes()],
+        'eigenvector_centrality': [metrics['eigenvector_centrality'][n] for n in G.nodes()],
+        'community': [metrics['communities'][n] for n in G.nodes()]
+    })
+
+    centrality_df = centrality_df.sort_values('degree_centrality',
+                                              ascending=False)
+    centrality_df.to_csv('lunar_node_metrics_pruned.csv', index=False)
+    print("Node metrics saved to: lunar_node_metrics_pruned.csv")
+
+    print("\n" + "="*80)
+    print("ANALYSIS COMPLETE!")
+    print("="*80)
+    print("\nGenerated Files:")
+    print(f"  Total Nodes in Final Graph: {G.number_of_nodes()}")
+    print("  1. lunar_landing_sites.csv        - Real surface locations (craters + landings)")
+    print("  2. lunar_satellites.csv           - Real orbital assets")
+    print("  3. lunar_network_edges_pruned.csv - Edge list (after thresholds)")
+    print("  4. lunar_node_metrics_pruned.csv  - Centrality + community metrics")
+    print("  5. enhanced_lunar_network_3d.png  - Full visualization figure")
+
+    print("\nTOP 10 NODES BY DEGREE CENTRALITY (PRUNED):")
+    print("-" * 80)
+    top_10 = centrality_df.head(10)
+    for idx, row in top_10.iterrows():
+        print(f"  {row['node']:30s} ({row['type']:9s} | {row['mission']:10s}) "
+              f"Degree: {row['degree_centrality']:.4f}")
+
+
 
 if __name__ == "__main__":
     main()
