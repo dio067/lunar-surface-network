@@ -28,7 +28,7 @@ def load_data(conn):
 
 
 # Create a graph
-def build_graph(landing_sites, satellites, surface_threshold=80):
+def create_graph(landing_sites, satellites, surface_threshold=80):
     G = nx.Graph()
 
     # Add landing site nodes
@@ -56,30 +56,19 @@ def build_graph(landing_sites, satellites, surface_threshold=80):
 
     return G
 
-    
-# Draw the graph
-colors = ['skyblue' if G.nodes[n]['type']=='surface' else 'orange' for n in G.nodes()]
-nx.draw(G, with_labels=True, node_color=colors, node_size=2000)
-plt.show()
+# Compute Network Metrics
+def compute_metrics(G):
+    deg = nx.degree_centrality(G)
+    eig = nx.eigenvector_centrality(G)
+    partition = community_louvain.best_partition(G)
 
-# Centerality Analysis
-deg = nx.degree_centrality(G)
-eig = nx.eigenvector_centrality(G)
+    # Von Neumann Entropy
+    A = nx.to_numpy_array(G)
+    L = np.diag(np.sum(A, axis=1)) - A
+    vals = np.linalg.eigvalsh(L)
+    vals = vals[vals > 1e-12]
+    p = vals / np.sum(vals)
+    HvN = -np.sum(p * np.log2(p))
 
-print("Degree Centrality:", deg)
-print("Eigenvector Centrality:", eig)
-
-# Modularity (Communities)
-partition = community_louvain.best_partition(G)
-print("Communities:", partition)
-
-
-#Von Neumann Entropy
-A = nx.to_numpy_array(G)
-L = np.diag(np.sum(A, axis=1)) - A
-vals = np.linalg.eigvalsh(L)
-vals = vals[vals > 1e-12]
-p = vals / np.sum(vals)
-HvN = -np.sum(p * np.log2(p))
-print("Von Neumann Entropy:", HvN)
+    return deg, eig, partition, HvN
 
