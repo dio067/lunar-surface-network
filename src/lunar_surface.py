@@ -56,7 +56,7 @@ def create_graph(landing_sites, satellites, surface_threshold=80):
 
     return G
 
-# Compute Network Metrics
+# Compute Metrics
 def compute_metrics(G):
     deg = nx.degree_centrality(G)
     eig = nx.eigenvector_centrality(G)
@@ -71,4 +71,13 @@ def compute_metrics(G):
     HvN = -np.sum(p * np.log2(p))
 
     return deg, eig, partition, HvN
+
+# Visualize Graph
+def visualize_graph(G):
+    colors = ['skyblue' if G.nodes[n]['type']=='surface' else 'orange' for n in G.nodes()]
+    nx.draw(G, with_labels=True, node_color=colors, node_size=1500)
+    plt.show()
+
+
+
 
