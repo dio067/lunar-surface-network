@@ -581,6 +581,135 @@ def print_detailed_discription(G, landing, sats, metrics):
     print("="*80 + "\n")
 
 
+# Lunar Data Craters + Landing Sites + Satellites
+def generate_enhanced_nasa_data():
+    """
+    Generate REAL lunar network data using:
+    - Famous lunar craters from LRO / PDS
+    - Real Apollo & Luna landing sites
+    - A small set of real lunar orbiters
+    Kept small on purpose to reduce nodes & edges and improve visualization.
+    """
+
+    # ==========================
+    # REAL LUNAR CRATERS (LRO/PDS)
+    # ==========================
+    landing_craters = pd.DataFrame({
+        'name': [
+            'Tycho Crater',
+            'Copernicus Crater',
+            'Aristarchus Crater',
+            'Plato Crater',
+            'Kepler Crater',
+            'Clavius Crater',
+            'Langrenus Crater',
+            'Humboldt Crater',
+            'Gassendi Crater'
+        ],
+        'lat': [
+            -43.3,   # Tycho
+            9.62,    # Copernicus
+            23.7,    # Aristarchus
+            51.6,    # Plato
+            8.1,     # Kepler
+            -58.8,   # Clavius
+            -8.9,    # Langrenus
+            -27.0,   # Humboldt
+            -17.5    # Gassendi
+        ],
+        'lon': [
+            -11.2,   # Tycho
+            -20.08,  # Copernicus
+            -47.4,   # Aristarchus
+            -9.3,    # Plato
+            -38.0,   # Kepler
+            -14.0,   # Clavius
+            61.0,    # Langrenus
+            80.9,    # Humboldt
+            -39.2    # Gassendi
+        ],
+        'type': ['surface'] * 9,
+        'mission_type': ['Crater'] * 9
+    })
+
+    # ==========================
+    # REAL LANDING SITES (Apollo + Luna)
+    # ==========================
+    landing_sites_real = pd.DataFrame({
+        'name': [
+            'Apollo 11 Landing Site',
+            'Apollo 12 Landing Site',
+            'Apollo 14 Landing Site',
+            'Apollo 15 Landing Site',
+            'Luna 9 Landing Site',
+            'Luna 16 Landing Site'
+        ],
+        'lat': [
+            0.674,   # Apollo 11
+            -3.012,  # Apollo 12
+            -3.645,  # Apollo 14
+            26.132,  # Apollo 15
+            7.08,    # Luna 9
+            -0.68    # Luna 16
+        ],
+        'lon': [
+            23.473,   # Apollo 11 (E)
+            -23.421,  # Apollo 12 (W)
+            -17.471,  # Apollo 14 (W)
+            3.633,    # Apollo 15 (E)
+            -64.37,   # Luna 9 (W)
+            56.3      # Luna 16 (E)
+        ],
+        'type': ['surface'] * 6,
+        'mission_type': [
+            'Apollo', 'Apollo', 'Apollo', 'Apollo',
+            'Luna', 'Luna'
+        ]
+    })
+
+    # MERGE craters + landing sites ⇒ all surface nodes
+    landing_sites = pd.concat([landing_craters, landing_sites_real],
+                              ignore_index=True)
+
+    # ==========================
+    # SMALL REAL SATELLITE SET
+    # ==========================
+    satellites = pd.DataFrame({
+        'name': [
+            'LRO',                     # Lunar Reconnaissance Orbiter (NASA)
+            'Chandrayaan-2 Orbiter',   # ISRO
+            'KPLO (Danuri)'            # KARI
+        ],
+        'lat': [
+            0.0,
+            -25.0,
+            10.0
+        ],
+        'lon': [
+            0.0,
+            45.0,
+            -90.0
+        ],
+        'altitude_km': [
+            50,     # low polar
+            100,    # rough mean
+            100
+        ],
+        'coverage_radius_km': [
+            800,
+            900,
+            900
+        ],
+        'type': ['satellite'] * 3,
+        'mission_type': [
+            'NASA',
+            'ISRO',
+            'KARI'
+        ]
+    })
+
+    return landing_sites, satellites
+
 
 # Main
 def main():
