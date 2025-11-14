@@ -8,25 +8,30 @@ from mpl_toolkits.mplot3d.proj3d import proj_transform
 from mpl_toolkits.mplot3d.axes3d import Axes3D
 from community import community_louvain
 
-# # Database Connection
-# def get_db_connection():
-#     conn = psycopg2.connect(
-#         host="db.lueuzoseflstoiilozqt.supabase.co",
-#         dbname="postgres",
-#         user="readonly_user",
-#         password="StrongPassword123",
-#         port="5432"
-#     )
-#     return conn
-
-# # Load Data from DB
-# def load_data(conn):
-#     landing_sites = pd.read_sql("SELECT * FROM landing_sites;", conn)
-#     satellites = pd.read_sql("SELECT * FROM satellites;", conn)
-#     return landing_sites, satellites
 
 # Constants
 MOON_RADIUS_KM = 1737.4
+
+
+# Haversine formula for distance on sphere
+def haversine(lat1, lon1, lat2, lon2):
+    """Calculate great-circle distance on lunar surface"""
+    lat1, lon1, lat2, lon2 = map(np.radians, [lat1, lon1, lat2, lon2])
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    a = (np.sin(dlat/2)**2 +
+         np.cos(lat1) * np.cos(lat2) * np.sin(dlon/2)**2)
+    c = 2 * np.arcsin(np.sqrt(a))
+    return MOON_RADIUS_KM * c
+
+
+
+# Save to CSV
+def save_to_csv(landing, sats):
+    landing.to_csv("lunar_landing_sites.csv", index=False)
+    sats.to_csv("lunar_satellites.csv", index=False)
+    print("CSV files saved")
+
 
 # Create a graph
 def create_graph(landing, sats, surface_threshold_km=900, max_isl_range=2500):
@@ -716,7 +721,6 @@ def generate_enhanced_nasa_data():
 
 # Main Excution
 def main():
-    def main():
     print("\n" + "="*80)
     print("LUNAR COMMUNICATION NETWORK ANALYSIS")
     print("Real Dataset: Famous Craters + Apollo/Luna Sites + 3 Orbiters")
