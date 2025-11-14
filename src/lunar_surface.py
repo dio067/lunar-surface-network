@@ -125,19 +125,62 @@ def create_graph(landing, sats, surface_threshold_km=900, max_isl_range=2500):
 
 # Compute Metrics
 def compute_metrics(G):
-    deg = nx.degree_centrality(G)
-    eig = nx.eigenvector_centrality(G)
-    partition = community_louvain.best_partition(G)
+    print("\nComputing metrics...")
+
+    degree_cent = nx.degree_centrality(G)
+    bet_cent = nx.betweenness_centrality(G, weight='weight')
+    close_cent = nx.closeness_centrality(G, distance='weight')
+
+    # eigenvector (handle disconnected)
+    try:
+        eigen_cent = nx.eigenvector_centrality(G, max_iter=900, weight='weight')
+    except:
+        biggest = max(nx.connected_components(G), key=len)
+        G2 = G.subgraph(biggest).copy()
+        eigen_cent = nx.eigenvector_centrality(G2, max_iter=900, weight='weight')
+        for node in G.nodes():
+            if node not in eigen_cent:
+                eigen_cent[node] = 0.0
+
+    # Louvain modularity
+    communities = community_louvain.best_partition(G, weight='weight')
+    modularity = community_louvain.modularity(communities, G, weight='weight')
 
     # Von Neumann Entropy
     A = nx.to_numpy_array(G)
-    L = np.diag(np.sum(A, axis=1)) - A
-    vals = np.linalg.eigvalsh(L)
-    vals = vals[vals > 1e-12]
-    p = vals / np.sum(vals)
-    HvN = -np.sum(p * np.log2(p))
+    degs = np.sum(A, axis=1)
+    degs[degs == 0] = 1
+    D_inv = np.diag(1.0 / np.sqrt(degs))
+    Lnorm = np.eye(len(G)) - D_inv @ A @ D_inv
 
-    return deg, eig, partition, HvN
+    vals = np.linalg.eigvalsh(Lnorm)
+    vals = vals[vals > 1e-12]
+    vals = vals / np.sum(vals)
+    vne = -np.sum(vals * np.log2(vals + 1e-10))
+
+    # clustering / path
+    avg_clustering = nx.average_clustering(G)
+    if nx.is_connected(G):
+        avg_path = nx.average_shortest_path_length(G, weight='weight')
+        diameter = nx.diameter(G)
+    else:
+        comp = max(nx.connected_components(G), key=len)
+        G2 = G.subgraph(comp)
+        avg_path = nx.average_shortest_path_length(G2, weight='weight')
+        diameter = nx.diameter(G2)
+
+    return {
+        'degree_centrality': degree_cent,
+        'betweenness_centrality': bet_cent,
+        'closeness_centrality': close_cent,
+        'eigenvector_centrality': eigen_cent,
+        'communities': communities,
+        'modularity': modularity,
+        'von_neumann_entropy': vne,
+        'avg_clustering': avg_clustering,
+        'avg_path_length': avg_path,
+        'diameter': diameter
+    }
 
 # Visualize Graph
 def visualize_graph(G):
