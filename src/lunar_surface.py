@@ -22,38 +22,41 @@ def get_db_connection():
 def load_data(conn):
     landing_sites = pd.read_sql("SELECT * FROM landing_sites;", conn)
     satellites = pd.read_sql("SELECT * satellites;", conn)
-    craters = pd.read_sql("SELECT * FROM craters;", conn)
 
-    return landing_sites, satellites, craters
+    return landing_sites, satellites
+
+
 
 # Create a graph
-G = nx.Graph();
+def build_graph(landing_sites, satellites, surface_threshold=80):
+    G = nx.Graph()
 
+    # Add landing site nodes
+    for _, row in landing_sites.iterrows():
+        G.add_node(row['mission'], type='surface', lat=row['latitude'], lon=row['longitude'])
 
-# Add Surface Sites Nodes
-for _, row in sites.iterrows():
-   G.add_node(row['name'], type=row['type'], lat=row['lat'], lon=row['lon'])
+    # Add satellite nodes
+    for _, row in satellites.iterrows():
+        G.add_node(row['name'], type='satellite', lat=row['latitude'], lon=row['longitude'])
 
+    # Surface ↔ Surface edges
+    for i, site1 in landing_sites.iterrows():
+        for j, site2 in landing_sites.iterrows():
+            if i < j:
+                dist = np.sqrt((site1.latitude - site2.latitude)**2 + (site1.longitude - site2.longitude)**2)
+                if dist < surface_threshold:
+                    G.add_edge(site1.mission, site2.mission, weight=dist)
 
-# Add Satellites Nodes
-for _, row in sats.iterrows():
-    G.add_node(row['name'], pos=(row['lon'], row['lat']), type='satellite');
+    # Satellite ↔ Surface edges
+    for _, sat in satellites.iterrows():
+        for _, site in landing_sites.iterrows():
+            dist = np.sqrt((sat.altitude_km)**2 + (sat.latitude - site.latitude)**2 + (sat.longitude - site.longitude)**2)
+            if dist <= sat.coverage_radius_km:
+                G.add_edge(sat.name, site.mission, weight=dist)
 
-# Add edges Surface 
-  for i, site1 in sites.iterrows():
-    for j, site2 in sites.iterrows():
-        dist = np.sqrt((site1.lat - site2.lat)**2 + (site1.lon - site2.lon)**2)
-          if dist < 80:
-            G.add_edge(site1.name, site2.name, weight=dist)
+    return G
 
-
-# Add edges Satellite 
-for _, sat1 in sats.iterrows():
-    for _, site in sites.iterrows():
-        dist = np.sqrt((sat.altitude_km)**2 + (site.lat - site.lat)**2 + (site.lon - site.lon)**2)
-        if dist <= sat.coverage_radius_km:
-            G.add_edge(sat.name, site.name, weight=dist)
-
+    
 # Draw the graph
 colors = ['skyblue' if G.nodes[n]['type']=='surface' else 'orange' for n in G.nodes()]
 nx.draw(G, with_labels=True, node_color=colors, node_size=2000)
