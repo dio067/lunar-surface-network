@@ -1,10 +1,9 @@
-import pandas as pd;
-import numpy as np;
-import networkx as nx;
-import matplotlib.pyplot as plt;
+import pandas as pd
+import numpy as np
+import networkx as nx
+import matplotlib.pyplot as plt
 import community as community_louvain
 import psycopg2
-
 
 # Database Connection
 def get_db_connection():
@@ -17,15 +16,11 @@ def get_db_connection():
     )
     return conn
 
-
 # Load Data from DB
 def load_data(conn):
     landing_sites = pd.read_sql("SELECT * FROM landing_sites;", conn)
-    satellites = pd.read_sql("SELECT * satellites;", conn)
-
+    satellites = pd.read_sql("SELECT * FROM satellites;", conn)
     return landing_sites, satellites
-
-
 
 # Create a graph
 def create_graph(landing_sites, satellites, surface_threshold=80):
@@ -33,26 +28,26 @@ def create_graph(landing_sites, satellites, surface_threshold=80):
 
     # Add landing site nodes
     for _, row in landing_sites.iterrows():
-        G.add_node(row['mission'], type='surface', lat=row['latitude'], lon=row['longitude'])
+        G.add_node(row['name'], type='surface', lat=row['lat'], lon=row['lon'])
 
     # Add satellite nodes
     for _, row in satellites.iterrows():
-        G.add_node(row['name'], type='satellite', lat=row['latitude'], lon=row['longitude'])
+        G.add_node(row['name'], type='satellite', lat=row['lat'], lon=row['lon'], altitude_km=row['altitude_km'], coverage_km=row['coverage_radius_km'])
 
     # Surface ↔ Surface edges
     for i, site1 in landing_sites.iterrows():
         for j, site2 in landing_sites.iterrows():
             if i < j:
-                dist = np.sqrt((site1.latitude - site2.latitude)**2 + (site1.longitude - site2.longitude)**2)
+                dist = np.sqrt((site1.lat - site2.lat)**2 + (site1.lon - site2.lon)**2)
                 if dist < surface_threshold:
-                    G.add_edge(site1.mission, site2.mission, weight=dist)
+                    G.add_edge(site1.name, site2.name, weight=dist)
 
     # Satellite ↔ Surface edges
     for _, sat in satellites.iterrows():
         for _, site in landing_sites.iterrows():
-            dist = np.sqrt((sat.altitude_km)**2 + (sat.latitude - site.latitude)**2 + (sat.longitude - site.longitude)**2)
-            if dist <= sat.coverage_radius_km:
-                G.add_edge(sat.name, site.mission, weight=dist)
+            dist = np.sqrt((sat.altitude_km)**2 + (sat.lat - site.lat)**2 + (sat.lon - site.lon)**2)
+            if dist <= sat.coverage_km:
+                G.add_edge(sat.name, site.name, weight=dist)
 
     return G
 
@@ -78,17 +73,14 @@ def visualize_graph(G):
     nx.draw(G, with_labels=True, node_color=colors, node_size=1500)
     plt.show()
 
-
-
-
+# Main
 def main():
-    conn = get_connection()
+    conn = get_db_connection()
     landing_sites, satellites = load_data(conn)
-    G = build_graph(landing_sites, satellites)
+    G = create_graph(landing_sites, satellites)
     deg, eig, partition, HvN = compute_metrics(G)
     visualize_graph(G)
 
-    # Print metrics
     print("Degree Centrality:", deg)
     print("Eigenvector Centrality:", eig)
     print("Communities:", partition)
