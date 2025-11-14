@@ -181,11 +181,282 @@ def compute_metrics(G):
         'avg_path_length': avg_path,
         'diameter': diameter
     }
+    
+# Helpers
+def lat_lon_to_3d(lat, lon, radius=MOON_RADIUS_KM):
+    """Convert lat/lon to 3D Cartesian coordinates"""
+    lat_rad = np.radians(lat)
+    lon_rad = np.radians(lon)
+    x = radius * np.cos(lat_rad) * np.cos(lon_rad)
+    y = radius * np.cos(lat_rad) * np.sin(lon_rad)
+    z = radius * np.sin(lat_rad)
+    return x, y, z
+    
+
+
+def plot_3d_moon_sphere(ax, alpha=0.05):
+    """Draw a wireframe sphere representing the Moon"""
+    u = np.linspace(0, 2 * np.pi, 50)
+    v = np.linspace(0, np.pi, 50)
+    x = MOON_RADIUS_KM * np.outer(np.cos(u), np.sin(v))
+    y = MOON_RADIUS_KM * np.outer(np.sin(u), np.sin(v))
+    z = MOON_RADIUS_KM * np.outer(np.ones(np.size(u)), np.cos(v))
+    ax.plot_wireframe(x, y, z, color='gray', alpha=alpha, linewidth=0.3)
+
 
 # Visualize Graph
-def visualize_graph(G):
-    colors = ['skyblue' if G.nodes[n]['type']=='surface' else 'orange' for n in G.nodes()]
-    nx.draw(G, with_labels=True, node_color=colors, node_size=1500)
+def visualize_3d_network(G, landing, sats, metrics, save_fig=True):
+    """Create 3D + 2D visualizations and metric plots"""
+    communities = metrics['communities']
+
+    fig = plt.figure(figsize=(20, 15))
+
+    ax1 = fig.add_subplot(2, 3, 1, projection='3d')
+    plot_3d_moon_sphere(ax1, alpha=0.08)
+
+    # 3D positions
+    pos_3d = {}
+    for node in G.nodes():
+        node_data = G.nodes[node]
+        if node_data['type'] == 'surface':
+            x, y, z = lat_lon_to_3d(node_data['lat'], node_data['lon'])
+        else:
+            radius = MOON_RADIUS_KM + node_data['altitude']
+            x, y, z = lat_lon_to_3d(node_data['lat'], node_data['lon'], radius)
+        pos_3d[node] = (x, y, z)
+
+    edge_colors = {
+        'surface_link': '#00bfff',
+        'comm_link': '#ff6b6b',
+        'inter_sat_link': '#4ecdc4'
+    }
+
+    # draw edges
+    for u, v, data in G.edges(data=True):
+        x_vals = [pos_3d[u][0], pos_3d[v][0]]
+        y_vals = [pos_3d[u][1], pos_3d[v][1]]
+        z_vals = [pos_3d[u][2], pos_3d[v][2]]
+
+        etype = data.get('edge_type', 'surface_link')
+        color = edge_colors.get(etype, 'gray')
+        alpha = 0.6 if etype == 'comm_link' else 0.4
+        lw = 0.8 if etype == 'inter_sat_link' else 0.5
+
+        ax1.plot(x_vals, y_vals, z_vals,
+                 color=color, alpha=alpha, linewidth=lw)
+
+    # draw nodes
+    for node in G.nodes():
+        node_data = G.nodes[node]
+        x, y, z = pos_3d[node]
+
+        if node_data['type'] == 'surface':
+            color = plt.cm.tab10(communities[node] % 10)
+            size = 80 + 200 * metrics['degree_centrality'][node]
+            marker = 'o'
+        else:
+            color = 'gold'
+            size = 150 + 250 * metrics['degree_centrality'][node]
+            marker = '^'
+
+        ax1.scatter(x, y, z,
+                    c=[color],
+                    s=size,
+                    marker=marker,
+                    edgecolors='black',
+                    linewidths=0.5,
+                    alpha=0.9)
+        ax1.text(x, y, z, node, fontsize=6)
+
+    ax1.set_xlabel('X (km)', fontsize=10)
+    ax1.set_ylabel('Y (km)', fontsize=10)
+    ax1.set_zlabel('Z (km)', fontsize=10)
+    ax1.set_title('3D Lunar Communication Network\n(Node size = Degree Centrality)',
+                  fontsize=13, fontweight='bold', pad=20)
+
+    # legend
+    from matplotlib.lines import Line2D
+    legend_elements = [
+        Line2D([0], [0], color='#00bfff', linewidth=2, label='Surface Links'),
+        Line2D([0], [0], color='#ff6b6b', linewidth=2, label='Comm Links'),
+        Line2D([0], [0], color='#4ecdc4', linewidth=2, label='Inter-Sat Links'),
+        Line2D([0], [0], marker='o', color='w', markerfacecolor='skyblue',
+               markersize=10, label='Surface Sites'),
+        Line2D([0], [0], marker='^', color='w', markerfacecolor='gold',
+               markersize=10, label='Satellites')
+    ]
+    ax1.legend(handles=legend_elements, loc='upper left', fontsize=8)
+
+    # === 2D PROJECTION ===
+    ax2 = plt.subplot(2, 3, 2)
+    pos_2d = {n: (G.nodes[n]["lon"], G.nodes[n]["lat"]) for n in G.nodes()}
+
+    for edge_type, color in edge_colors.items():
+        edges_of_type = [(u, v) for u, v, d in G.edges(data=True)
+                         if d.get('edge_type') == edge_type]
+        nx.draw_networkx_edges(
+            G, pos_2d,
+            edgelist=edges_of_type,
+            alpha=0.4,
+            width=1.2,
+            edge_color=color,
+            ax=ax2
+        )
+
+    surface_nodes = [n for n in G.nodes() if G.nodes[n]['type'] == 'surface']
+    sat_nodes = [n for n in G.nodes() if G.nodes[n]['type'] == 'satellite']
+
+    surface_colors = [communities[n] for n in surface_nodes]
+    surface_sizes = [100 + 400 * metrics['degree_centrality'][n] for n in surface_nodes]
+
+    nx.draw_networkx_nodes(
+        G, pos_2d,
+        nodelist=surface_nodes,
+        node_color=surface_colors,
+        node_size=surface_sizes,
+        cmap='tab10',
+        alpha=0.8,
+        ax=ax2
+    )
+
+    sat_sizes = [200 + 500 * metrics['degree_centrality'][n] for n in sat_nodes]
+    nx.draw_networkx_nodes(
+        G, pos_2d,
+        nodelist=sat_nodes,
+        node_color='gold',
+        node_size=sat_sizes,
+        node_shape='^',
+        alpha=0.9,
+        edgecolors='black',
+        ax=ax2
+    )
+
+    all_labels = {n: n for n in G.nodes()}
+    nx.draw_networkx_labels(
+        G, pos_2d,
+        labels=all_labels,
+        font_size=7,
+        font_weight='bold',
+        ax=ax2
+    )
+
+    ax2.set_xlabel('Longitude (°)', fontsize=10)
+    ax2.set_ylabel('Latitude (°)', fontsize=10)
+    ax2.set_title('2D Network Projection (Lat/Lon)',
+                  fontsize=12, fontweight='bold')
+    ax2.grid(True, alpha=0.3)
+    ax2.set_aspect('equal')
+
+    # === CENTRALITY COMPARISON ===
+    ax3 = plt.subplot(2, 3, 3)
+
+    top_nodes = sorted(
+        metrics['degree_centrality'].items(),
+        key=lambda x: x[1],
+        reverse=True
+    )[:12]
+    names = [n for n, _ in top_nodes]
+
+    deg_vals = [metrics['degree_centrality'][n] for n in names]
+    bet_vals = [metrics['betweenness_centrality'][n] for n in names]
+    eig_vals = [metrics['eigenvector_centrality'][n] for n in names]
+
+    x = np.arange(len(names))
+    width = 0.25
+
+    ax3.barh(x - width, deg_vals, width,
+             label='Degree', alpha=0.8, color='skyblue')
+    ax3.barh(x, bet_vals, width,
+             label='Betweenness', alpha=0.8, color='coral')
+    ax3.barh(x + width, eig_vals, width,
+             label='Eigenvector', alpha=0.8, color='lightgreen')
+
+    ax3.set_yticks(x)
+    ax3.set_yticklabels(names, fontsize=8)
+    ax3.set_xlabel('Centrality Value', fontsize=10)
+    ax3.set_title('Top Nodes: Centrality Comparison',
+                  fontsize=12, fontweight='bold')
+    ax3.legend(fontsize=8)
+    ax3.invert_yaxis()
+
+    # === COMMUNITY STRUCTURE ===
+    ax4 = plt.subplot(2, 3, 4)
+    community_counts = {}
+    for node, comm in communities.items():
+        community_counts[comm] = community_counts.get(comm, 0) + 1
+
+    colors_comm = plt.cm.tab10(np.linspace(0, 1, len(community_counts)))
+    ax4.bar(community_counts.keys(), community_counts.values(),
+            color=colors_comm, alpha=0.7, edgecolor='black')
+    ax4.set_xlabel('Community ID', fontsize=10)
+    ax4.set_ylabel('Number of Nodes', fontsize=10)
+    ax4.set_title(f'Community Distribution\n(Modularity: {metrics["modularity"]:.4f})',
+                  fontsize=12, fontweight='bold')
+    ax4.grid(axis='y', alpha=0.3)
+
+    # === DEGREE DISTRIBUTION ===
+    ax5 = plt.subplot(2, 3, 5)
+    degrees = [G.degree(n) for n in G.nodes()]
+    ax5.hist(degrees, bins=10,
+             color='steelblue', alpha=0.7, edgecolor='black')
+    ax5.axvline(np.mean(degrees),
+                color='red', linestyle='--', linewidth=2,
+                label=f'Mean: {np.mean(degrees):.1f}')
+    ax5.set_xlabel('Node Degree', fontsize=10)
+    ax5.set_ylabel('Frequency', fontsize=10)
+    ax5.set_title('Degree Distribution',
+                  fontsize=12, fontweight='bold')
+    ax5.legend()
+    ax5.grid(axis='y', alpha=0.3)
+
+    # === STATS PANEL ===
+    ax6 = plt.subplot(2, 3, 6)
+    ax6.axis('off')
+
+    stats_text = f"""
+    LUNAR NETWORK ANALYSIS REPORT
+    {'='*45}
+
+    TOPOLOGY
+    • Total Nodes:              {G.number_of_nodes()}
+    • Surface Sites:            {len([n for n in G.nodes() if G.nodes[n]['type']=='surface'])}
+    • Satellites:               {len([n for n in G.nodes() if G.nodes[n]['type']=='satellite'])}
+    • Total Edges:              {G.number_of_edges()}
+
+    CONNECTIVITY
+    • Network Density:          {nx.density(G):.4f}
+    • Avg Clustering Coeff:     {metrics['avg_clustering']:.4f}
+    • Avg Path Length:          {metrics['avg_path_length']:.2f}
+    • Network Diameter:         {metrics['diameter']:.2f}
+    • Is Connected:             {nx.is_connected(G)}
+
+    COMPLEXITY & STRUCTURE
+    • Von Neumann Entropy:      {metrics['von_neumann_entropy']:.4f}
+    • Modularity:               {metrics['modularity']:.4f}
+    • Number of Communities:    {len(set(communities.values()))}
+
+    INTERPRETATION
+    {('High entropy indicates diverse, complex' if metrics['von_neumann_entropy'] > 3 else 'Moderate complexity in') + ' connectivity patterns.'}
+    {('Strong modularity suggests distinct' if metrics['modularity'] > 0.3 else 'Weak modularity indicates integrated') + ' operational clusters.'}
+    """
+
+    ax6.text(
+        0.05, 0.95,
+        stats_text,
+        fontsize=9,
+        family='monospace',
+        verticalalignment='top',
+        bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.3)
+    )
+
+    plt.tight_layout()
+
+    if save_fig:
+        plt.savefig('enhanced_lunar_network_3d.png',
+                    dpi=300,
+                    bbox_inches='tight')
+        print("\n✓ Visualization saved as 'enhanced_lunar_network_3d.png'")
+
     plt.show()
 
 # Main
