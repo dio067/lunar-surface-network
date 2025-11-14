@@ -54,3 +54,14 @@ print("Eigenvector Centrality:", eig)
 # Modularity (Communities)
 partition = community_louvain.best_partition(G)
 print("Communities:", partition)
+
+
+#Von Neumann Entropy
+A = nx.to_numpy_array(G)
+L = np.diag(np.sum(A, axis=1)) - A
+vals = np.linalg.eigvalsh(L)
+vals = vals[vals > 1e-12]
+p = vals / np.sum(vals)
+HvN = -np.sum(p * np.log2(p))
+print("Von Neumann Entropy:", HvN)
+
