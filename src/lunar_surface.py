@@ -2,54 +2,126 @@ import pandas as pd
 import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
-import community as community_louvain
-import psycopg2
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib.patches import FancyArrowPatch
+from mpl_toolkits.mplot3d.proj3d import proj_transform
+from mpl_toolkits.mplot3d.axes3d import Axes3D
+from community import community_louvain
 
-# Database Connection
-def get_db_connection():
-    conn = psycopg2.connect(
-        host="db.lueuzoseflstoiilozqt.supabase.co",
-        dbname="postgres",
-        user="readonly_user",
-        password="StrongPassword123",
-        port="5432"
-    )
-    return conn
+# # Database Connection
+# def get_db_connection():
+#     conn = psycopg2.connect(
+#         host="db.lueuzoseflstoiilozqt.supabase.co",
+#         dbname="postgres",
+#         user="readonly_user",
+#         password="StrongPassword123",
+#         port="5432"
+#     )
+#     return conn
 
-# Load Data from DB
-def load_data(conn):
-    landing_sites = pd.read_sql("SELECT * FROM landing_sites;", conn)
-    satellites = pd.read_sql("SELECT * FROM satellites;", conn)
-    return landing_sites, satellites
+# # Load Data from DB
+# def load_data(conn):
+#     landing_sites = pd.read_sql("SELECT * FROM landing_sites;", conn)
+#     satellites = pd.read_sql("SELECT * FROM satellites;", conn)
+#     return landing_sites, satellites
 
 # Create a graph
-def create_graph(landing_sites, satellites, surface_threshold=80):
+def create_graph(landing, sats, surface_threshold_km=900, max_isl_range=2500):
     G = nx.Graph()
+    edges_data = []
 
-    # Add landing site nodes
-    for _, row in landing_sites.iterrows():
-        G.add_node(row['name'], type='surface', lat=row['lat'], lon=row['lon'])
+    # --- ADD SURFACE NODES ---
+    for _, row in landing.iterrows():
+        G.add_node(row["name"],
+                   type="surface",
+                   lat=row["lat"],
+                   lon=row["lon"],
+                   mission_type=row["mission_type"])
 
-    # Add satellite nodes
-    for _, row in satellites.iterrows():
-        G.add_node(row['name'], type='satellite', lat=row['lat'], lon=row['lon'], altitude_km=row['altitude_km'], coverage_km=row['coverage_radius_km'])
+    # --- ADD SATELLITES ---
+    for _, row in sats.iterrows():
+        G.add_node(row["name"],
+                   type="satellite",
+                   lat=row["lat"],
+                   lon=row["lon"],
+                   altitude=row["altitude_km"],
+                   coverage=row["coverage_radius_km"],
+                   mission_type=row["mission_type"])
 
-    # Surface ↔ Surface edges
-    for i, site1 in landing_sites.iterrows():
-        for j, site2 in landing_sites.iterrows():
-            if i < j:
-                dist = np.sqrt((site1.lat - site2.lat)**2 + (site1.lon - site2.lon)**2)
-                if dist < surface_threshold:
-                    G.add_edge(site1.name, site2.name, weight=dist)
+    # --- SURFACE ↔ SURFACE ---
+    for i in range(len(landing)):
+        for j in range(i+1, len(landing)):
+            s1 = landing.iloc[i]
+            s2 = landing.iloc[j]
+            dist = haversine(s1.lat, s1.lon, s2.lat, s2.lon)
 
-    # Satellite ↔ Surface edges
-    for _, sat in satellites.iterrows():
-        for _, site in landing_sites.iterrows():
-            dist = np.sqrt((sat.altitude_km)**2 + (sat.lat - site.lat)**2 + (sat.lon - site.lon)**2)
-            if dist <= sat.coverage_km:
-                G.add_edge(sat.name, site.name, weight=dist)
+            if dist <= surface_threshold_km:
+                G.add_edge(s1['name'], s2['name'],
+                           weight=dist,
+                           edge_type='surface_link')
+                edges_data.append({
+                    'source': s1['name'],
+                    'target': s2['name'],
+                    'weight': dist,
+                    'edge_type': 'surface_link'
+                })
 
-    return G
+    # --- SATELLITE ↔ SURFACE ---
+    for _, sat in sats.iterrows():
+        for _, site in landing.iterrows():
+            surf_dist = haversine(site.lat, site.lon, sat.lat, sat.lon)
+            total_dist = np.sqrt(surf_dist**2 + sat.altitude_km**2)
+
+            if total_dist <= sat.coverage_radius_km:
+                G.add_edge(sat['name'], site['name'],
+                           weight=total_dist,
+                           edge_type='comm_link')
+                edges_data.append({
+                    'source': sat['name'],
+                    'target': site['name'],
+                    'weight': total_dist,
+                    'edge_type': 'comm_link'
+                })
+
+    # --- SATELLITE ↔ SATELLITE ---
+    for i in range(len(sats)):
+        for j in range(i+1, len(sats)):
+            sat1 = sats.iloc[i]
+            sat2 = sats.iloc[j]
+
+            surf_dist = haversine(sat1.lat, sat1.lon, sat2.lat, sat2.lon)
+            alt_diff = abs(sat1.altitude_km - sat2.altitude_km)
+            sat_dist = np.sqrt(surf_dist**2 + alt_diff**2)
+
+            if sat_dist <= max_isl_range:
+                G.add_edge(sat1['name'], sat2['name'],
+                           weight=sat_dist,
+                           edge_type='inter_sat_link')
+
+                edges_data.append({
+                    'source': sat1['name'],
+                    'target': sat2['name'],
+                    'weight': sat_dist,
+                    'edge_type': 'inter_sat_link'
+                })
+
+    edges_df = pd.DataFrame(edges_data)
+    edges_df.to_csv("lunar_network_edges_pruned.csv", index=False)
+
+    # --- PRUNE nodes with degree <= 1 ---
+    remove_list = [n for n, deg in G.degree() if deg <= 1]
+    G_pruned = G.copy()
+    G_pruned.remove_nodes_from(remove_list)
+
+    landing_pruned = landing[landing['name'].isin(G_pruned.nodes())]
+    sats_pruned = sats[sats['name'].isin(G_pruned.nodes())]
+
+    print("\nPRUNED GRAPH")
+    print(f"Nodes: {G_pruned.number_of_nodes()}")
+    print(f"Edges: {G_pruned.number_of_edges()}")
+
+    return G_pruned, edges_df, landing_pruned, sats_pruned
+
 
 # Compute Metrics
 def compute_metrics(G):
