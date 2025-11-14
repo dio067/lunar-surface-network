@@ -3,13 +3,17 @@ import numpy as np;
 import networkx as nx;
 import matplotlib.pyplot as plt;
 import community as community_louvain
+import psycopg2
+
+
+
 
 
 # Load lunar surface site data and satellite data
 sites = pd.read_csv('../data/surface_sites.csv');
 sats = pd.read_csv('../data/satellite_data.csv');
 
-
+    
 
 # Create a graph
 G = nx.Graph();
