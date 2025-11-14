@@ -192,8 +192,6 @@ def lat_lon_to_3d(lat, lon, radius=MOON_RADIUS_KM):
     z = radius * np.sin(lat_rad)
     return x, y, z
     
-
-
 def plot_3d_moon_sphere(ax, alpha=0.05):
     """Draw a wireframe sphere representing the Moon"""
     u = np.linspace(0, 2 * np.pi, 50)
@@ -414,7 +412,7 @@ def visualize_3d_network(G, landing, sats, metrics, save_fig=True):
     ax6.axis('off')
 
     stats_text = f"""
-    LUNAR NETWORK ANALYSIS REPORT
+    LUNAR NETWORK ANALYSIS DISCRIPTION
     {'='*45}
 
     TOPOLOGY
@@ -458,6 +456,131 @@ def visualize_3d_network(G, landing, sats, metrics, save_fig=True):
         print("\n✓ Visualization saved as 'enhanced_lunar_network_3d.png'")
 
     plt.show()
+
+
+# Detailed Discription
+def print_detailed_discription(G, landing, sats, metrics):
+    print("\n" + "="*80)
+    print("LUNAR COMMUNICATION NETWORK ANALYSIS - COMPREHENSIVE DISCRIPTION(PRUNED)")
+    print("Based on REAL Lunar Craters + Apollo/Luna Landing Sites + Orbital Assets")
+    print("="*80)
+
+    print("\n1. NETWORK TOPOLOGY")
+    print("-" * 80)
+    print(f"   Total Nodes: {G.number_of_nodes()}")
+    print(f"   • Surface Landing/Craters: {len(landing)}")
+    print(f"   • Orbital Assets: {len(sats)}")
+    print(f"   Total Edges: {G.number_of_edges()}")
+    print(f"   Network Density: {nx.density(G):.4f}")
+
+    deg_cent = sorted(metrics['degree_centrality'].items(), key=lambda x: x[1], reverse=True)[:8]
+    bet_cent = sorted(metrics['betweenness_centrality'].items(), key=lambda x: x[1], reverse=True)[:8]
+    eig_cent = sorted(metrics['eigenvector_centrality'].items(), key=lambda x: x[1], reverse=True)[:8]
+
+    print("\n2. DEGREE CENTRALITY (Top 8 - Most Connected Nodes)")
+    print("-" * 80)
+    for i, (node, cent) in enumerate(deg_cent, 1):
+        node_type = G.nodes[node]['type']
+        mission = G.nodes[node].get('mission_type', 'N/A')
+        print(f"   {i}. {node:30s} ({node_type:9s} | {mission:10s}): {cent:.4f}")
+
+    print("\n3. BETWEENNESS CENTRALITY (Top 8 - Critical Bridge Nodes)")
+    print("-" * 80)
+    for i, (node, cent) in enumerate(bet_cent, 1):
+        node_type = G.nodes[node]['type']
+        mission = G.nodes[node].get('mission_type', 'N/A')
+        print(f"   {i}. {node:30s} ({node_type:9s} | {mission:10s}): {cent:.4f}")
+
+    print("\n4. EIGENVECTOR CENTRALITY (Top 8 - Influence/Cluster Hubs)")
+    print("-" * 80)
+    for i, (node, cent) in enumerate(eig_cent, 1):
+        node_type = G.nodes[node]['type']
+        mission = G.nodes[node].get('mission_type', 'N/A')
+        print(f"   {i}. {node:30s} ({node_type:9s} | {mission:10s}): {cent:.4f}")
+
+    print("\n5. COMMUNITY DETECTION & MODULARITY")
+    print("-" * 80)
+    print(f"   Modularity Score: {metrics['modularity']:.4f}")
+    num_communities = len(set(metrics['communities'].values()))
+    print(f"   Number of Communities: {num_communities}")
+    print("\n   Community Membership:")
+
+    comm_groups = {}
+    for node, comm_id in metrics['communities'].items():
+        comm_groups.setdefault(comm_id, []).append(node)
+
+    for comm_id, nodes in sorted(comm_groups.items()):
+        print(f"\n   Community {comm_id} ({len(nodes)} nodes):")
+        for node in nodes[:5]:
+            node_type = G.nodes[node]['type']
+            print(f"      • {node} ({node_type})")
+        if len(nodes) > 5:
+            print(f"      ... and {len(nodes)-5} more")
+
+    print("\n6. ENTROPY & COMPLEXITY")
+    print("-" * 80)
+    print(f"   Von Neumann Entropy: {metrics['von_neumann_entropy']:.4f}")
+    print("   Interpretation: ", end="")
+    if metrics['von_neumann_entropy'] > 3.5:
+        print("High complexity - diverse connectivity patterns")
+    elif metrics['von_neumann_entropy'] > 2.5:
+        print("Moderate complexity - balanced network structure")
+    else:
+        print("Low complexity - more regular structure")
+
+    print("\n7. NETWORK EFFICIENCY")
+    print("-" * 80)
+    print(f"   Average Clustering Coefficient: {metrics['avg_clustering']:.4f}")
+    print(f"   Average Path Length: {metrics['avg_path_length']:.2f}")
+    print(f"   Network Diameter: {metrics['diameter']:.2f}")
+    print(f"   Connected Components: {nx.number_connected_components(G)}")
+
+    print("\n8. ROBUSTNESS ANALYSIS")
+    print("-" * 80)
+    critical_nodes = [n for n, c in metrics['betweenness_centrality'].items() if c > 0.1]
+    print(f"   Critical Nodes (betweenness > 0.1): {len(critical_nodes)}")
+    print(f"   Top Critical: {', '.join([n for n, _ in bet_cent[:3]])}")
+
+    if nx.is_connected(G):
+        edge_conn = nx.edge_connectivity(G)
+        node_conn = nx.node_connectivity(G)
+        print(f"   Edge Connectivity: {edge_conn}")
+        print(f"   Node Connectivity: {node_conn}")
+    else:
+        print(f"   Network is disconnected - {nx.number_connected_components(G)} components")
+
+    print("\n9. MISSION-BASED ANALYSIS")
+    print("-" * 80)
+    mission_counts = {}
+    for node in G.nodes():
+        mission = G.nodes[node].get('mission_type', 'Unknown')
+        mission_counts[mission] = mission_counts.get(mission, 0) + 1
+
+    print("   Nodes by Mission Program:")
+    for mission, count in sorted(mission_counts.items(), key=lambda x: x[1], reverse=True):
+        print(f"      {mission:15s}: {count:2d} nodes")
+
+    print("\n10. EDGE TYPE DISTRIBUTION")
+    print("-" * 80)
+    edge_types = {}
+    total_weight = 0
+    for u, v, data in G.edges(data=True):
+        etype = data.get('edge_type', 'unknown')
+        edge_types[etype] = edge_types.get(etype, 0) + 1
+        total_weight += data.get('weight', 0)
+
+    print(f"   Edge Types:")
+    for etype, count in edge_types.items():
+        print(f"      {etype:20s}: {count:3d} edges")
+    if G.number_of_edges() > 0:
+        print(f"   Total Network Weight (distance): {total_weight:.2f} km")
+        print(f"   Average Edge Weight: {total_weight/G.number_of_edges():.2f} km")
+
+    print("\n" + "="*80)
+    print("END OF DISCRIPTION")
+    print("="*80 + "\n")
+
+
 
 # Main
 def main():
