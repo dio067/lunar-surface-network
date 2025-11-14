@@ -6,14 +6,25 @@ import community as community_louvain
 import psycopg2
 
 
+# Database Connection
+def get_db_connection():
+    conn = psycopg2.connect(
+        host="db.lueuzoseflstoiilozqt.supabase.co",
+        dbname="postgres",
+        user="readonly_user",
+        password="StrongPassword123",
+        port="5432"
+    )
+    return conn
 
 
+# Load Data from DB
+def load_data(conn):
+    landing_sites = pd.read_sql("SELECT * FROM landing_sites;", conn)
+    satellites = pd.read_sql("SELECT * satellites;", conn)
+    craters = pd.read_sql("SELECT * FROM craters;", conn)
 
-# Load lunar surface site data and satellite data
-sites = pd.read_csv('../data/surface_sites.csv');
-sats = pd.read_csv('../data/satellite_data.csv');
-
-    
+    return landing_sites, satellites, craters
 
 # Create a graph
 G = nx.Graph();
