@@ -1,0 +1,11 @@
+numpy
+pandas
+networkx
+matplotlib
+geopandas
+shapely
+python-louvain
+astropy
+scikit-image
+seaborn
+scipy
